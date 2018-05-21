@@ -1,0 +1,53 @@
+{
+    "name": "barisbora/parasut",
+    "description": "PARASUT V4 API Laravel Bridge",
+    "keywords": [
+        "barisbora",
+        "parasut",
+        "parasut-api"
+    ],
+    "homepage": "https://github.com/barisbora/parasut",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Barış Bora",
+            "email": "baris.bora@itu.edu.tr",
+            "homepage": "https://github.com/barisbora",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^7.0",
+        "guzzlehttp/guzzle": "^6.3"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^6.1|^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "barisbora\\Parasut\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "barisbora\\Parasut\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "phpunit --coverage-html coverage"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "barisbora\\Parasut\\ParasutServiceProvider"
+            ],
+            "aliases": {
+                "Parasut": "barisbora\\Parasut\\Facade"
+            }
+        }
+    }
+}
