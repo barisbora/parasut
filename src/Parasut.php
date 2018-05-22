@@ -2,10 +2,16 @@
 
 namespace barisbora\Parasut;
 
+use barisbora\Parasut\Dependencies\Address;
+use barisbora\Parasut\Dependencies\Company;
+use barisbora\Parasut\Dependencies\Owner;
+use barisbora\Parasut\Dependencies\Permission;
 use barisbora\Parasut\Dependencies\User;
 use barisbora\Parasut\Exceptions\AuthorizationException;
 use barisbora\Parasut\Exceptions\ConfigFileNotExistsOrProper;
 use barisbora\Parasut\Exceptions\RequestException;
+use barisbora\Parasut\Methods\SalesInvoice;
+use barisbora\Parasut\Tools\Helper;
 use GuzzleHttp\Client;
 use Carbon\Carbon;
 use Cache;
@@ -15,15 +21,32 @@ use GuzzleHttp\HandlerStack;
 class Parasut
 {
 
+    use Helper;
+
     private $accessToken;
 
     private $refreshToken;
 
     private $tokenLife;
 
-    private $client;
+    public $client;
 
-    private $version = 'v4/';
+    public $version = 'v4/';
+
+    /**
+     * @var User
+     */
+    private $user;
+
+    /**
+     * @var Illuminate\Support\Collection
+     */
+    private $companies;
+
+    /**
+     * @var Company|null
+     */
+    private $company;
 
     public static function boot()
     {
@@ -67,6 +90,8 @@ class Parasut
                     if ( $code == 401 ) throw new AuthorizationException( 'Unauthorized' );
 
                     $body = json_decode( $response->getBody()->getContents() );
+
+                    dd($body);
 
                     throw new RequestException( $body->error_description );
 
@@ -129,13 +154,67 @@ class Parasut
 
             if ( $remember ) {
 
-                return $this->setCredentials( Cache::remember( 'parasut_credentials', 110, $getCredentials ) );
+                $this->setCredentials( Cache::remember( 'parasut_credentials', 110, $getCredentials ) );
+
+            } else {
+
+                $this->setCredentials( $getCredentials() );
 
             }
 
-            return $this->setCredentials( $getCredentials() );
-
         }
+
+        // Me
+        $data = $this->parseResponse( $this->client->get( $this->version . 'me' ) );
+
+        // User
+        $this->user = new User( $data );
+
+        // Companies
+        $includes = collect( $data->included );
+
+        # Companies
+        $this->companies = $includes->where( 'type', 'companies' )->transform( function ( $company ) use ( $includes ) {
+
+            $model = new Company( $company );
+
+            $role = $includes->filter( function ( $include ) use ( $company ) {
+
+                return $include->type == 'user_roles' && $include->relationships->company->data->id == $company->id;
+
+            } )->first();
+
+            if ( $role ) $model->setRole( new Permission( $role ) );
+
+            if ( $company->relationships->address ) {
+
+                $address = $includes->filter( function ( $include ) use ( $company ) {
+
+                    return $include->type == 'addresses' && $include->id == $company->relationships->address->data->id;
+
+                } )->first();
+
+                if ( $address ) $model->setAddress( new Address( $address ) );
+
+            }
+
+            if ( $company->relationships->owner ) {
+
+                $owner = $includes->filter( function ( $include ) use ( $company ) {
+
+                    return $include->type == 'users' && $include->id == $company->relationships->owner->data->id;
+
+                } )->first();
+
+                if ( $owner ) $model->setOwner( new Owner( $owner ) );
+
+            }
+
+            return $model;
+
+        } )->values();
+
+        if ( $this->companies->count() === 1 ) $this->company = $this->companies->first();
 
         return $this;
 
@@ -169,14 +248,37 @@ class Parasut
     }
 
     /**
-     * @return mixed
+     * @return \barisbora\Parasut\Dependencies\User
      */
     public function me()
     {
+        return $this->user;
+    }
 
-        $this->connect();
+    /**
+     * @return \barisbora\Parasut\Dependencies\Company|null
+     */
+    public function company()
+    {
+        return $this->company;
+    }
 
-        return new User( $this->parseResponse( $this->client->get( $this->version . 'me' ) ) );
+    /**
+     * @param callable $callable
+     * @return \barisbora\Parasut\Illuminate\Support\Collection
+     */
+    public function companies( callable $callable )
+    {
+
+        $this->companies->each( function ( $company ) use ( $callable ) {
+
+            $callable( $company );
+
+            if ( $company->isSelected() ) $this->company = $company;
+
+        } );
+
+        return $this;
 
     }
 
@@ -199,20 +301,20 @@ class Parasut
     }
 
     /**
-     * @return bool
+     * @return \barisbora\Parasut\Methods\SalesInvoice
+     * @throws \barisbora\Parasut\Exceptions\CompanyNotSelectedException
      */
-    public function isConnected()
+    public function salesInvoices()
     {
-        return $this->accessToken && $this->tokenLife->greaterThan( Carbon::now() );
+        return new SalesInvoice( $this );
     }
 
     /**
-     * @param $response
-     * @return mixed
+     * @return bool
      */
-    private function parseResponse( $response )
+    private function isConnected()
     {
-        return json_decode( $response->getBody()->getContents() );
+        return $this->accessToken && $this->tokenLife->greaterThan( Carbon::now() );
     }
 
     /**
@@ -223,6 +325,9 @@ class Parasut
         if ( ! ! ! config( 'parasut.username' ) || ! ! ! config( 'parasut.password' ) || ! ! ! config( 'parasut.client-id' ) || ! ! ! config( 'parasut.client-secret' ) ) throw new ConfigFileNotExistsOrProper( 'Paraşüt config file does not exists or config/parasut.php is not proper' );
     }
 
+    /**
+     * @return \Closure
+     */
     private function authorizationHeader()
     {
         return function ( $handler ) {

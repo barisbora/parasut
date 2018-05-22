@@ -20,6 +20,7 @@ class Company
     public $role;
     public $created_at;
     public $updated_at;
+    private $isSelected = false;
 
     public function __construct( $data )
     {
@@ -56,6 +57,16 @@ class Company
         $this->role = $role;
 
         return $this;
+    }
+
+    public function select()
+    {
+        $this->isSelected = true;
+    }
+
+    public function isSelected()
+    {
+        return $this->isSelected;
     }
 
 }
