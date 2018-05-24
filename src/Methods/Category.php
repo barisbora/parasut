@@ -2,7 +2,7 @@
 
 use barisbora\Parasut\Dependencies\Model;
 
-class SalesInvoice extends Eloquent
+class Category extends Eloquent
 {
 
     /**
@@ -11,16 +11,20 @@ class SalesInvoice extends Eloquent
     public function get()
     {
 
-        $data = $this->endpoint( 'sales_invoices/', 'get', $this->query->query() );
+        $data = $this->endpoint( 'item_categories', 'get', $this->query->query() );
 
         return Model::build( $data );
 
     }
 
+    /**
+     * @param $id
+     * @return Model
+     */
     public function find( $id )
     {
 
-        $data = $this->endpoint( 'sales_invoices/' . $id, 'get', $this->query->query() );
+        $data = $this->endpoint( 'item_categories/' . $id, 'get', $this->query->query() );
 
         return Model::build( $data );
 

@@ -10,6 +10,8 @@ use barisbora\Parasut\Dependencies\User;
 use barisbora\Parasut\Exceptions\AuthorizationException;
 use barisbora\Parasut\Exceptions\ConfigFileNotExistsOrProper;
 use barisbora\Parasut\Exceptions\RequestException;
+use barisbora\Parasut\Methods\Category;
+use barisbora\Parasut\Methods\Product;
 use barisbora\Parasut\Methods\SalesInvoice;
 use barisbora\Parasut\Tools\Helper;
 use GuzzleHttp\Client;
@@ -91,9 +93,21 @@ class Parasut
 
                     $body = json_decode( $response->getBody()->getContents() );
 
-                    dd($body);
+                    if ( isset( $body->error_description ) ) throw new RequestException( $body->error_description );
 
-                    throw new RequestException( $body->error_description );
+                    if ( isset( $body->errors) ) {
+
+                        $errors = collect($body->errors)->transform(function($error) {
+
+                            return $error->title . ' : ' .  $error->detail;
+
+                        })->values()->implode(PHP_EOL);
+
+                        throw new RequestException( $errors );
+
+                    }
+
+                    throw new RequestException( $body );
 
                 } );
 
@@ -304,9 +318,28 @@ class Parasut
      * @return \barisbora\Parasut\Methods\SalesInvoice
      * @throws \barisbora\Parasut\Exceptions\CompanyNotSelectedException
      */
-    public function salesInvoices()
+    public function salesInvoice()
     {
         return new SalesInvoice( $this );
+    }
+
+    /**
+     * @return \barisbora\Parasut\Methods\Product
+     * @throws \barisbora\Parasut\Exceptions\CompanyNotSelectedException
+     */
+    public function product()
+    {
+        return new Product( $this );
+    }
+
+
+    /**
+     * @return \barisbora\Parasut\Methods\Category
+     * @throws \barisbora\Parasut\Exceptions\CompanyNotSelectedException
+     */
+    public function category()
+    {
+        return new Category( $this );
     }
 
     /**

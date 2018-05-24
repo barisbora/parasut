@@ -1,6 +1,6 @@
 <?php namespace barisbora\Parasut\Parameters;
 
-abstract class Parameter
+class Query
 {
 
     public function __construct()
@@ -113,5 +113,12 @@ abstract class Parameter
         unset( $data[ 'includes' ] );
 
         return array_merge( $options, [ 'form_params' => $data ] );
+    }
+
+    public static function methods()
+    {
+        $methods = get_class_methods( self::class );
+
+        return array_diff( $methods, [ '__construct', 'query', 'methods' ] );
     }
 }
